@@ -38,10 +38,14 @@ def token_auth_required(f):
         if payload is None:
             raise UnauthorizedError
         user_id = payload['id']
-        user = User.query.filter_by(id=user_id).first()
+		if payload['user_type'] == 'Organizer':
+			user = Organizer.query.filter_by(id=user_id).first()
+		else:
+        	user = Attendee.query.filter_by(id=user_id).first()
         if user is None:
             raise UnauthorizedError()
         kwargs['user'] = user
+		kwargs['user_type'] = payload['user_type']
         return f(*args, **kwargs)
     return decorated_function
 

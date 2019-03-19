@@ -1,6 +1,4 @@
 from app import db, max_len
-import hashlib
-import uuid
 from app.models.timestamp import TimestampMixin
 
 
