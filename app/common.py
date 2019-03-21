@@ -3,8 +3,9 @@ from functools import wraps
 from flask import request
 
 from app.errors import Error, StatusCode, UnauthorizedError
-from app.models.users import User
 from app import jwttoken, task_queue
+from app.models.attendee import Attendee
+from app.models.organizer import Organizer
 
 
 def parse_args_with_schema(schema):
@@ -38,14 +39,14 @@ def token_auth_required(f):
         if payload is None:
             raise UnauthorizedError
         user_id = payload['id']
-		if payload['user_type'] == 'Organizer':
-			user = Organizer.query.filter_by(id=user_id).first()
-		else:
-        	user = Attendee.query.filter_by(id=user_id).first()
+        if payload['user_type'] == 'Organizer':
+            user = Organizer.query.filter_by(id=user_id).first()
+        else:
+            user = Attendee.query.filter_by(id=user_id).first()
         if user is None:
             raise UnauthorizedError()
         kwargs['user'] = user
-		kwargs['user_type'] = payload['user_type']
+        kwargs['user_type'] = payload['user_type']
         return f(*args, **kwargs)
     return decorated_function
 

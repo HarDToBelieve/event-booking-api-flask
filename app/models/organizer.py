@@ -14,6 +14,9 @@ class Organizer(db.Model, TimestampMixin):
     password_hash = db.Column(db.String(max_len))
     password_salt = db.Column(db.String(max_len))
 
+    def __init__(self, *args, **kwargs):
+        super(Organizer, self).__init__(*args, **kwargs)
+
     def set_password(self, password):
         salt = uuid.uuid4().hex
         hashed_password = hashlib.sha512((password + salt).encode('utf-8')).hexdigest()

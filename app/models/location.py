@@ -9,6 +9,9 @@ class Location(db.Model, TimestampMixin):
     address = db.Column(db.String(max_len), index=True, unique=True)
     capacity = db.Column(db.Integer)
     owner_id = db.Column(db.Integer, db.ForeignKey('organizers.id'))
+    
+    def __init__(self, *args, **kwargs):
+        super(Location, self).__init__(*args, **kwargs)
 
     def serialize(self):
         return {

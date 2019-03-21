@@ -1,12 +1,13 @@
 import datetime
 
-from flask import jsonify
+from flask import jsonify, request
 from marshmallow import Schema, fields, validate
 
 from app import app, db, jwttoken, max_len
 from app.common import parse_args_with_schema, token_auth_required
 from app.errors import Error, StatusCode
 from app.models.attendee import Attendee
+from app.models.event import Event
 
 
 class UserSignUpSchema(Schema):
@@ -31,10 +32,14 @@ class UserUpdateSchema(Schema):
     phone = fields.String(validate=validate.Length(max=max_len))
 
 
-@app.route('attendee/register', methods=['POST'])
+class EventListSchema(Schema):
+    page = fields.Integer()
+
+
+@app.route(app.config['PREFIX'] + '/attendees/register', methods=['POST'])
 @parse_args_with_schema(UserSignUpSchema)
 def attendee_signup(args):
-    if len(args['signup_code']) > 0:
+    if 'signup_code' in args and len(args['signup_code']) > 0:
         attendee = Attendee.query.filter_by(email=args['email'], signup_code=args['signup_code']).first()
         if attendee is None:
             raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Email not found')
@@ -49,8 +54,9 @@ def attendee_signup(args):
         attendee = Attendee.query.filter_by(email=args['email']).first()
         if attendee is not None:
             raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Duplicated email')
-        attendee = Attendee(**args)
-        attendee.set_password(password = args['password'])
+        attendee = Attendee(firstname=args['firstname'], lastname=args['lastname'],
+                            email=args['email'], phone=args['phone'])
+        attendee.set_password(password=args['password'])
         db.session.add(attendee)
         db.session.commit()
         return jsonify({
@@ -59,7 +65,7 @@ def attendee_signup(args):
         }), 201
 
 
-@app.route('attendee/login', methods=['POST'])
+@app.route(app.config['PREFIX'] + '/attendees/login', methods=['POST'])
 @parse_args_with_schema(UserLogInSchema)
 def attendee_login(args):
     attendee = Attendee.query.filter_by(email=args['email']).first()
@@ -70,7 +76,7 @@ def attendee_login(args):
     raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid email or password.')
 
 
-@app.route('attendee/info/update', methods=['PUT'])
+@app.route(app.config['PREFIX'] + '/attendees/profile/update', methods=['PUT'])
 @parse_args_with_schema(UserUpdateSchema)
 @token_auth_required
 def attendee_update_info(user, user_type, args):
@@ -86,11 +92,31 @@ def attendee_update_info(user, user_type, args):
     }), 201
 
 
-@app.route('attendee/info', methods=['GET'])
+@app.route(app.config['PREFIX'] + '/attendees/profile', methods=['GET'])
 @token_auth_required
 def attendee_get_info(user, user_type):
     if user_type != 'Attendee':
         raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid token')
     return jsonify({
         'result': user.serialize()
+    }), 200
+
+
+@app.route(app.config['PREFIX'] + '/attendees/<int:attendee_id>/events', methods=['GET'])
+@parse_args_with_schema(EventListSchema)
+@token_auth_required
+def event_get_private_by_attendee(user, user_type, attendee_id, args):
+    if user_type != 'Attendee':
+        raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid token')
+    page = None if request.args.get('page') is None else int(request.args.get('page'))
+    list_evs = Event.query.filter_by(attendee_id=attendee_id)
+    has_next = 1
+    if page is not None and page == -(-list_evs.total // 10):
+        has_next = 0
+    elif page is None:
+        has_next = 0
+        
+    return jsonify({
+        'has_next': has_next,
+        'events': [x.serialize() for x in list_evs.items]
     }), 200

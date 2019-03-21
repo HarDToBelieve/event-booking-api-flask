@@ -30,18 +30,15 @@ class UserUpdateSchema(Schema):
     phone = fields.String(validate=validate.Length(max=max_len))
 
 
-class UserListAllSchema(Schema):
-    page = fields.Integer()
-
-
-@app.route('organizer/register', methods=['POST'])
+@app.route(app.config['PREFIX'] + '/organizers/register', methods=['POST'])
 @parse_args_with_schema(UserSignUpSchema)
 def organizer_register(args):
     organizer = Organizer.query.filter_by(email=args['email']).first()
     if organizer is not None:
         raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Duplicated email')
-    organizer = Organizer(**args)
-    organizer.set_password(password = args['password'])
+    organizer = Organizer(firstname=args['firstname'], lastname=args['lastname'],
+                          email=args['email'], phone=args['phone'])
+    organizer.set_password(password=args['password'])
     db.session.add(organizer)
     db.session.commit()
     return jsonify({
@@ -50,7 +47,7 @@ def organizer_register(args):
     }), 201
 
 
-@app.route('organizer/login', methods=['POST'])
+@app.route(app.config['PREFIX'] + '/organizers/login', methods=['POST'])
 @parse_args_with_schema(UserLogInSchema)
 def organizer_login(args):
     organizer = Organizer.query.filter_by(email=args['email']).first()
@@ -61,7 +58,7 @@ def organizer_login(args):
     raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid email or password.')
 
 
-@app.route('organizer/info/update', methods=['PUT'])
+@app.route(app.config['PREFIX'] + '/organizers/info/update', methods=['PUT'])
 @parse_args_with_schema(UserUpdateSchema)
 @token_auth_required
 def organizer_update_info(user, user_type, args):
@@ -77,7 +74,7 @@ def organizer_update_info(user, user_type, args):
     }), 201
 
 
-@app.route('organizer/info', methods=['GET'])
+@app.route(app.config['PREFIX'] + '/organizers/info', methods=['GET'])
 @token_auth_required
 def organizer_get_info(user, user_type):
     if user_type != 'Organizer':
@@ -87,8 +84,7 @@ def organizer_get_info(user, user_type):
     }), 200
 
 
-@app.route('organizer/list', methods=['GET'])
-@parse_args_with_schema(UserListAllSchema)
+@app.route(app.config['PREFIX'] + '/organizers/', methods=['GET'])
 def organizer_list_all():
     page = None if request.args.get('page') is None else int(request.args.get('page'))
     result = Organizer.query.paginate(page=page, per_page=15)
@@ -104,7 +100,7 @@ def organizer_list_all():
     }), 200
 
 
-@app.route('organizer/list/<int:organizer_id>', methods=['GET'])
+@app.route(app.config['PREFIX'] + '/organizers/profile/<int:organizer_id>', methods=['GET'])
 def organizer_get_specific_info(organizer_id):
     organizer = Organizer.query.filter_by(id=organizer_id).first()
     if organizer is None:

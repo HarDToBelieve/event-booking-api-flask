@@ -22,11 +22,7 @@ class LocationUpdateSchema(Schema):
     capacity = fields.Integer()
 
 
-class LocationListAllSchema(Schema):
-    page = fields.Integer()
-
-
-@app.route('location/new', methods=['POST'])
+@app.route(app.config['PREFIX'] + '/locations/create', methods=['POST'])
 @parse_args_with_schema(LocationCreateSchema)
 @token_auth_required
 def location_create(user, user_type, args):
@@ -49,7 +45,7 @@ def location_create(user, user_type, args):
     }), 201
 
 
-@app.route('location/update/<int:location_id>', methods=['PUT'])
+@app.route(app.config['PREFIX'] + '/locations/update/<int:location_id>', methods=['PUT'])
 @parse_args_with_schema(LocationUpdateSchema)
 @token_auth_required
 def location_update(user, user_type, location_id, args):
@@ -66,7 +62,7 @@ def location_update(user, user_type, location_id, args):
     }), 201
 
 
-@app.route('location/delete/<int:location_id>', methods=['DELETE'])
+@app.route(app.config['PREFIX'] + '/locations/delete/<int:location_id>', methods=['DELETE'])
 @token_auth_required
 def location_delete(user, user_type, location_id):
     if user_type != 'Organizer':
@@ -81,8 +77,7 @@ def location_delete(user, user_type, location_id):
     }), 201
 
 
-@app.route('location/list', methods=['GET'])
-@parse_args_with_schema(LocationListAllSchema)
+@app.route(app.config['PREFIX'] + '/locations/', methods=['GET'])
 def location_list_all():
     page = None if request.args.get('page') is None else int(request.args.get('page'))
     result = Location.query.paginate(page=page, per_page=15)
@@ -94,11 +89,11 @@ def location_list_all():
 
     return jsonify({
         'has_next': has_next,
-        'organizers': [x.serialize() for x in result.items]
+        'locations': [x.serialize() for x in result.items]
     }), 200
 
 
-@app.route('location/info/<int:location_id>', methods=['GET'])
+@app.route(app.config['PREFIX'] + '/locations/<int:location_id>', methods=['GET'])
 def location_get_specific_info(location_id):
     location = Location.query.filter_by(id=location_id).first()
     if location is None:
@@ -106,8 +101,7 @@ def location_get_specific_info(location_id):
     return jsonify({'result': location.serialize()}), 200
 
 
-@app.route('location/list/<int:owner_id>', methods=['GET'])
-@parse_args_with_schema(LocationListAllSchema)
+@app.route(app.config['PREFIX'] + '/locations/<int:owner_id>', methods=['GET'])
 def location_get_by_owner(owner_id):
     owner = Organizer.query.filter_by(id=owner_id).first()
     if owner is None:

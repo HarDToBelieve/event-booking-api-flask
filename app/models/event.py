@@ -17,6 +17,9 @@ class Event(db.Model, TimestampMixin):
     img = db.Column(db.String(max_len))
     type = db.Column(db.String(max_len))
 
+    def __init__(self, *args, **kwargs):
+        super(Event, self).__init__(*args, **kwargs)
+        
     def serialize(self):
         return {
             'id': self.id,
