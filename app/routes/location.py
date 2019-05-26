@@ -13,16 +13,14 @@ from app.models.organizer import Organizer
 class LocationCreateSchema(Schema):
     name_location = fields.String(validate=validate.Length(max=max_len), required=True)
     address = fields.String(validate=validate.Length(max=max_len), required=True)
-    capacity = fields.Integer(required=True)
 
 
 class LocationUpdateSchema(Schema):
     name_location = fields.String(validate=validate.Length(max=max_len))
     address = fields.String(validate=validate.Length(max=max_len))
-    capacity = fields.Integer()
 
 
-@app.route(app.config['PREFIX'] + '/locations/create', methods=['POST'])
+@app.route(app.config['PREFIX'] + '/locations/create/', methods=['POST'])
 @parse_args_with_schema(LocationCreateSchema)
 @token_auth_required
 def location_create(user, user_type, args):
@@ -34,7 +32,6 @@ def location_create(user, user_type, args):
     location = Location(
         name_location=args['name_location'],
         address=args['address'],
-        capacity=args['capacity'],
         owner_id=user.id
     )
     db.session.add(location)
@@ -70,7 +67,7 @@ def location_delete(user, user_type, location_id):
     location = Location.query.filter_by(id=location_id, owner_id=user.id).first()
     if location is None:
         raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Location not found')
-    location.delete()
+    db.session.delete(location)
     db.session.commit()
     return jsonify({
         'message': 'Location deleted successfully'
@@ -99,25 +96,3 @@ def location_get_specific_info(location_id):
     if location is None:
         raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Location not found')
     return jsonify({'result': location.serialize()}), 200
-
-
-@app.route(app.config['PREFIX'] + '/locations/<int:owner_id>', methods=['GET'])
-def location_get_by_owner(owner_id):
-    owner = Organizer.query.filter_by(id=owner_id).first()
-    if owner is None:
-        raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Owner not found')
-    
-    page = None if request.args.get('page') is None else int(request.args.get('page'))
-    result = Location.query.filter_by(owner_id=owner_id).paginate(page=page, per_page=15)
-    has_next = 1
-    if page is not None and page == -(-result.total // 10):
-        has_next = 0
-    elif page is None:
-        has_next = 0
-
-    return jsonify({
-        'owner_id': owner_id,
-        'has_next': has_next,
-        'locations': [x.serialize() for x in result.items]
-    }), 200
-

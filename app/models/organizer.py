@@ -14,6 +14,9 @@ class Organizer(db.Model, TimestampMixin):
     password_hash = db.Column(db.String(max_len))
     password_salt = db.Column(db.String(max_len))
 
+    events = db.relationship('Event')
+    locations = db.relationship('Location')
+    
     def __init__(self, *args, **kwargs):
         super(Organizer, self).__init__(*args, **kwargs)
 
@@ -35,3 +38,7 @@ class Organizer(db.Model, TimestampMixin):
             'email': self.email,
             'phone': self.phone
         }
+
+    def update(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)

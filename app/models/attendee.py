@@ -15,6 +15,8 @@ class Attendee(db.Model, TimestampMixin):
     password_hash = db.Column(db.String(max_len))
     password_salt = db.Column(db.String(max_len))
 
+    reservations = db.relationship('Reservation')
+
     def __init__(self, *args, **kwargs):
         super(Attendee, self).__init__(*args, **kwargs)
 
@@ -34,6 +36,9 @@ class Attendee(db.Model, TimestampMixin):
             'firstname': self.firstname,
             'lastname': self.lastname,
             'email': self.email,
-            'phone': self.phone,
-            'signup_code': self.signup_code
+            'phone': self.phone
         }
+
+    def update(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)

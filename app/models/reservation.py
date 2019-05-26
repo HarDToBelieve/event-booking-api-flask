@@ -11,6 +11,9 @@ class Reservation(db.Model, TimestampMixin):
     event_id = db.Column(db.Integer, db.ForeignKey('events.id'))
     attendee_id = db.Column(db.Integer, db.ForeignKey('attendees.id'))
 
+    events = db.relationship("Event")
+    attendees = db.relationship("Attendee")
+
     def __init__(self, *args, **kwargs):
         super(Reservation, self).__init__(*args, **kwargs)
 

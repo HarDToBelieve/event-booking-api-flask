@@ -32,6 +32,10 @@ def event_confirm(user, user_type, event_id):
     if datetime.datetime.now().date() > event.end_date:
         raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Expired event')
     
+    reservations = event.attendees
+    if len(reservations) == event.capacity:
+        raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Out of slot')
+    
     reservation = Reservation.query.filter_by(event_id=event_id, attendee_id=user.id,
                                               status='PENDING').first()
     if reservation is None:

@@ -32,10 +32,6 @@ class UserUpdateSchema(Schema):
     phone = fields.String(validate=validate.Length(max=max_len))
 
 
-class EventListSchema(Schema):
-    page = fields.Integer()
-
-
 @app.route(app.config['PREFIX'] + '/attendees/register', methods=['POST'])
 @parse_args_with_schema(UserSignUpSchema)
 def attendee_signup(args):
@@ -43,12 +39,13 @@ def attendee_signup(args):
         attendee = Attendee.query.filter_by(email=args['email'], signup_code=args['signup_code']).first()
         if attendee is None:
             raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Email not found')
-        attendee.update(args)
+        attendee.update(**args)
         attendee.signup_code = ''
         db.session.commit()
         return jsonify({
             'message': 'Attendee created successfully',
-            'data': attendee.serialize()
+            'data': attendee.serialize(),
+            'token': jwttoken.encode(attendee.id, 'Attendee')
         }), 201
     else:
         attendee = Attendee.query.filter_by(email=args['email']).first()
@@ -61,7 +58,8 @@ def attendee_signup(args):
         db.session.commit()
         return jsonify({
             'message': 'Attendee created successfully',
-            'data': attendee.serialize()
+            'data': attendee.serialize(),
+            'token': jwttoken.encode(attendee.id, 'Attendee')
         }), 201
 
 
@@ -71,7 +69,7 @@ def attendee_login(args):
     attendee = Attendee.query.filter_by(email=args['email']).first()
     if attendee and attendee.check_password(args['password']):
         return jsonify({
-            'access_token': jwttoken.encode(attendee.id, 'Attendee')
+            'token': jwttoken.encode(attendee.id, 'Attendee')
         }), 200
     raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid email or password.')
 
@@ -83,7 +81,7 @@ def attendee_update_info(user, user_type, args):
     if user_type != 'Attendee':
         raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid token')
     user.update(**args)
-    if len(args['password']) > 0:
+    if 'password' in args and len(args['password']) > 0:
         user.set_password(args['password'])
     db.session.commit()
     return jsonify({
@@ -102,21 +100,33 @@ def attendee_get_info(user, user_type):
     }), 200
 
 
-@app.route(app.config['PREFIX'] + '/attendees/<int:attendee_id>/events', methods=['GET'])
-@parse_args_with_schema(EventListSchema)
+@app.route(app.config['PREFIX'] + '/attendees/<int:attendee_id>/private_events', methods=['GET'])
 @token_auth_required
-def event_get_private_by_attendee(user, user_type, attendee_id, args):
+def event_get_private_by_attendee(user, user_type, attendee_id):
     if user_type != 'Attendee':
         raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid token')
-    page = None if request.args.get('page') is None else int(request.args.get('page'))
-    list_evs = Event.query.filter_by(attendee_id=attendee_id)
-    has_next = 1
-    if page is not None and page == -(-list_evs.total // 10):
-        has_next = 0
-    elif page is None:
-        has_next = 0
-        
-    return jsonify({
-        'has_next': has_next,
-        'events': [x.serialize() for x in list_evs.items]
-    }), 200
+    
+    reserves = user.reservations
+    result = []
+    for re in reserves:
+        ev = re.events
+        if ev.type == 'private':
+            result.append(ev)
+    
+    return jsonify([x.serialize() for x in result]), 200
+
+
+@app.route(app.config['PREFIX'] + '/attendees/<int:attendee_id>/events', methods=['GET'])
+@token_auth_required
+def event_get_public_by_attendee(user, user_type, attendee_id):
+    if user_type != 'Attendee':
+        raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid token')
+    
+    reserves = user.reservations
+    result = []
+    for re in reserves:
+        ev = re.events
+        if ev.type == 'public':
+            result.append(ev)
+    
+    return jsonify([x.serialize() for x in result]), 200

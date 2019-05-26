@@ -16,6 +16,9 @@ class Event(db.Model, TimestampMixin):
     category = db.Column(db.String(max_len))
     img = db.Column(db.String(max_len))
     type = db.Column(db.String(max_len))
+    capacity = db.Column(db.Integer)
+
+    reservations = db.relationship('Reservation')
 
     def __init__(self, *args, **kwargs):
         super(Event, self).__init__(*args, **kwargs)
@@ -31,5 +34,10 @@ class Event(db.Model, TimestampMixin):
             'owner_id': self.owner_id,
             'category': self.category,
             'img': self.img,
-            'type': self.type
+            'type': self.type,
+            'capacity': self.capacity
         }
+
+    def update(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)

@@ -11,6 +11,7 @@ from app.errors import Error, StatusCode
 from app.helper import allowed_image
 from app.models.event import Event
 from app.models.location import Location
+from app.models.organizer import Organizer
 
 
 class EventCreateSchema(Schema):
@@ -21,6 +22,7 @@ class EventCreateSchema(Schema):
     end_date = fields.Date()
     location_id = fields.Integer()
     type = fields.String(validate=validate.Length(max=max_len))
+    capacity = fields.Integer()
     
 
 class EventUpdateSchema(Schema):
@@ -31,6 +33,7 @@ class EventUpdateSchema(Schema):
     end_date = fields.Date()
     type = fields.String(validate=validate.Length(max=max_len))
     location_id = fields.Integer()
+    capacity = fields.Integer()
 
 
 @app.route(app.config['PREFIX'] + '/events/create', methods=['POST'])
@@ -46,7 +49,7 @@ def event_create(user, user_type, args):
 
     location = Location.query.filter_by(id=args['location_id'], owner_id=user.id).first()
     if location is None:
-        raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Location not found')
+        raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Location not belongs to owner')
     
     if args['type'] != 'public' and args['type'] != 'private':
         raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Invalid type of event')
@@ -61,7 +64,8 @@ def event_create(user, user_type, args):
         end_date=args['end_date'],
         location_id=location.id,
         owner_id=user.id,
-        type=args['type']
+        type=args['type'],
+        capacity=args['capacity']
     )
     
     db.session.add(event)
@@ -98,7 +102,7 @@ def event_delete(user, user_type, event_id):
     event = Event.query.filter_by(id=event_id, owner_id=user.id).first()
     if event is None:
         raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Location not found')
-    event.delete()
+    db.session.delete(event)
     db.session.commit()
     return jsonify({
         'message': 'Event deleted successfully'
@@ -108,7 +112,7 @@ def event_delete(user, user_type, event_id):
 @app.route(app.config['PREFIX'] + '/events/', methods=['GET'])
 def event_list_all():
     page = None if request.args.get('page') is None else int(request.args.get('page'))
-    result = Event.query.paginate(page=page, per_page=15)
+    result = Event.query.filter_by(type='public').paginate(page=page, per_page=15)
     has_next = 1
     if page is not None and page == -(-result.total // 10):
         has_next = 0
@@ -122,13 +126,32 @@ def event_list_all():
 
 
 @app.route(app.config['PREFIX'] + '/events/<int:event_id>', methods=['GET'])
-def event_get_info(event_id):
+@token_auth_required
+def event_get_info(user, user_type, event_id):
+    if user_type != 'Attendee':
+        raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid token')
     event = Event.query.filter_by(id=event_id).first()
+    
     if event is None:
         raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Event not found')
-    return jsonify({
-        'result': event.serialize()
-    }), 200
+    
+    owner = Organizer.query.filter_by(id=event.owner_id).first()
+    
+    if event.type == 'private':
+        for tmp in event.attendees:
+            if tmp.id == user.id:
+                return jsonify({
+                    'result': event.serialize(),
+                    'nummber_of_attendees': len(event.attendees),
+                    'contact': owner.email
+                }), 200
+        raise Error(status_code=StatusCode.FORBIDDEN, error_message='Permission denied')
+    else:
+        return jsonify({
+            'result': event.serialize(),
+            'nummber_of_attendees': len(event.attendees),
+            'contact': owner.email
+        }), 200
 
 
 @app.route(app.config['PREFIX'] + '/events/upload/<int:event_id>', methods=['POST'])
