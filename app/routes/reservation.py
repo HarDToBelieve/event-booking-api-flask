@@ -18,7 +18,7 @@ from app.models.reservation import Reservation
 import csv
 
 
-@app.route(app.config['PREFIX'] + '/reservations/confirm/<int:event_id>', methods=['POST'])
+@app.route(app.config['PREFIX'] + '/reservations/<int:event_id>/confirm', methods=['POST'])
 @token_auth_required
 def event_confirm(user, user_type, event_id):
     if user_type != 'Attendee':
@@ -94,7 +94,8 @@ def event_booking_handle(user, user_type):
                     db.session.add(reservation)
                     db.session.commit()
                 else:
-                    rand_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=32))
+                    rand_str = app.config['URL_MAIL'] + '?signup_code=' + \
+                               ''.join(random.choices(string.ascii_uppercase + string.digits, k=32))
                     new_user = Attendee(firstname='', lastname='', email=user_mail, phone='',
                                         signup_code=rand_str, password_hash='', password_salt='')
                     reservation = Reservation(status='PENDING', event_id=event.id, attendee_id=user.id)

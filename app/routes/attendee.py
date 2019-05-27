@@ -74,7 +74,7 @@ def attendee_login(args):
     raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid email or password.')
 
 
-@app.route(app.config['PREFIX'] + '/attendees/profile/update', methods=['PUT'])
+@app.route(app.config['PREFIX'] + '/attendees/profile', methods=['PUT'])
 @parse_args_with_schema(UserUpdateSchema)
 @token_auth_required
 def attendee_update_info(user, user_type, args):
@@ -100,9 +100,9 @@ def attendee_get_info(user, user_type):
     }), 200
 
 
-@app.route(app.config['PREFIX'] + '/attendees/<int:attendee_id>/private_events', methods=['GET'])
+@app.route(app.config['PREFIX'] + '/attendees/private_events', methods=['GET'])
 @token_auth_required
-def event_get_private_by_attendee(user, user_type, attendee_id):
+def event_get_private_by_attendee(user, user_type):
     if user_type != 'Attendee':
         raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid token')
     

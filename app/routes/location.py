@@ -42,7 +42,7 @@ def location_create(user, user_type, args):
     }), 201
 
 
-@app.route(app.config['PREFIX'] + '/locations/update/<int:location_id>', methods=['PUT'])
+@app.route(app.config['PREFIX'] + '/locations/<int:location_id>', methods=['PUT'])
 @parse_args_with_schema(LocationUpdateSchema)
 @token_auth_required
 def location_update(user, user_type, location_id, args):
@@ -59,7 +59,7 @@ def location_update(user, user_type, location_id, args):
     }), 201
 
 
-@app.route(app.config['PREFIX'] + '/locations/delete/<int:location_id>', methods=['DELETE'])
+@app.route(app.config['PREFIX'] + '/locations/<int:location_id>', methods=['DELETE'])
 @token_auth_required
 def location_delete(user, user_type, location_id):
     if user_type != 'Organizer':
@@ -84,13 +84,14 @@ def location_list_all():
     page = None if request.args.get('page') is None else int(request.args.get('page'))
     result = Location.query.paginate(page=page, per_page=15)
     has_next = 1
-    if page is not None and page == -(-result.total // 10):
+    if page is not None and page == -(-result.total // 15):
         has_next = 0
     elif page is None:
         has_next = 0
 
     return jsonify({
-        'has_next': has_next,
+        'current_page': page,
+        'next_page_url': has_next,
         'locations': [x.serialize() for x in result.items]
     }), 200
 

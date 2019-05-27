@@ -77,7 +77,7 @@ def event_create(user, user_type, args):
     }), 201
 
 
-@app.route(app.config['PREFIX'] + '/events/update/<int:event_id>', methods=['PUT'])
+@app.route(app.config['PREFIX'] + '/events/<int:event_id>', methods=['PUT'])
 @parse_args_with_schema(EventUpdateSchema)
 @token_auth_required
 def event_update(user, user_type, event_id, args):
@@ -94,7 +94,7 @@ def event_update(user, user_type, event_id, args):
     }), 201
 
 
-@app.route(app.config['PREFIX'] + '/events/delete/<int:event_id>', methods=['DELETE'])
+@app.route(app.config['PREFIX'] + '/events/<int:event_id>', methods=['DELETE'])
 @token_auth_required
 def event_delete(user, user_type, event_id):
     if user_type != 'Organizer':
@@ -113,14 +113,15 @@ def event_delete(user, user_type, event_id):
 def event_list_all():
     page = None if request.args.get('page') is None else int(request.args.get('page'))
     result = Event.query.filter_by(type='public').paginate(page=page, per_page=15)
-    has_next = 1
-    if page is not None and page == -(-result.total // 10):
-        has_next = 0
+    has_next = 'YES'
+    if page is not None and page == -(-result.total // 15):
+        has_next = None
     elif page is None:
-        has_next = 0
+        has_next = None
 
     return jsonify({
-        'has_next': has_next,
+        'current_page': page,
+        'next_page_url': has_next,
         'events': [x.serialize() for x in result.items]
     }), 200
 
@@ -154,7 +155,7 @@ def event_get_info(user, user_type, event_id):
         }), 200
 
 
-@app.route(app.config['PREFIX'] + '/events/upload/<int:event_id>', methods=['POST'])
+@app.route(app.config['PREFIX'] + '/events/<int:event_id>/upload', methods=['POST'])
 @token_auth_required
 def event_upload_image(user, user_type, event_id):
     if user_type != 'Organizer':

@@ -7,6 +7,7 @@ load_dotenv(dotenv_path=os.path.join(basedir, '.env'))
 
 class Config(object):
     PREFIX = '/event-booking-api/api'
+    URL_MAIL = ''
     SECRET_KEY = os.getenv('SECRET_KEY') or 'app-secret-key'
     SQLALCHEMY_DATABASE_URI = os.getenv('SQLALCHEMY_DATABASE_URI') or 'sqlite:///' + os.path.join(basedir, 'app.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False

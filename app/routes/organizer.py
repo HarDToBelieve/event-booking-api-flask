@@ -61,7 +61,7 @@ def organizer_login(args):
     raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid email or password.')
 
 
-@app.route(app.config['PREFIX'] + '/organizers/profile/update', methods=['PUT'])
+@app.route(app.config['PREFIX'] + '/organizers/profile', methods=['PUT'])
 @parse_args_with_schema(UserUpdateSchema)
 @token_auth_required
 def organizer_update_info(user, user_type, args):
@@ -87,18 +87,19 @@ def organizer_get_info(user, user_type):
     }), 200
 
 
-@app.route(app.config['PREFIX'] + '/organizers/', methods=['GET'])
+@app.route(app.config['PREFIX'] + '/organizers', methods=['GET'])
 def organizer_list_all():
     page = None if request.args.get('page') is None else int(request.args.get('page'))
     result = Organizer.query.paginate(page=page, per_page=15)
-    has_next = 1
+    has_next = 'YES'
     if page is not None and page == -(-result.total // 10):
-        has_next = 0
+        has_next = None
     elif page is None:
-        has_next = 0
+        has_next = None
 
     return jsonify({
-        'has_next': has_next,
+        'current_page': page,
+        'next_page_url': has_next,
         'organizers': [x.serialize() for x in result.items]
     }), 200
 
@@ -119,15 +120,16 @@ def location_get_by_owner(owner_id):
 
     page = None if request.args.get('page') is None else int(request.args.get('page'))
     result = Location.query.filter_by(owner_id=owner_id).paginate(page=page, per_page=15)
-    has_next = 1
-    if page is not None and page == -(-result.total // 10):
-        has_next = 0
+    has_next = 'YES'
+    if page is not None and page == -(-result.total // 15):
+        has_next = None
     elif page is None:
-        has_next = 0
+        has_next = None
 
     return jsonify({
         'owner_id': owner_id,
-        'has_next': has_next,
+        'current_page': page,
+        'next_page_url': has_next,
         'locations': [x.serialize() for x in result.items]
     }), 200
 
@@ -140,14 +142,15 @@ def event_get_by_owner(owner_id):
     
     page = None if request.args.get('page') is None else int(request.args.get('page'))
     result = Event.query.filter_by(owner_id=owner_id, type='public').paginate(page=page, per_page=15)
-    has_next = 1
-    if page is not None and page == -(-result.total // 10):
-        has_next = 0
+    has_next = 'YES'
+    if page is not None and page == -(-result.total // 15):
+        has_next = None
     elif page is None:
-        has_next = 0
+        has_next = None
     
     return jsonify({
         'owner_id': owner_id,
-        'has_next': has_next,
+        'current_page': page,
+        'next_page_url': has_next,
         'events': [x.serialize() for x in result.items]
     }), 200
