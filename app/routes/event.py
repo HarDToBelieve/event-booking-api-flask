@@ -20,7 +20,7 @@ class EventCreateSchema(Schema):
     category = fields.String(validate=validate.Length(max=max_len))
     start_date = fields.Date()
     end_date = fields.Date()
-    location_id = fields.Integer()
+    location_id = fields.Integer(required=True)
     type = fields.String(validate=validate.Length(max=max_len))
     capacity = fields.Integer()
     
@@ -36,7 +36,7 @@ class EventUpdateSchema(Schema):
     capacity = fields.Integer()
 
 
-@app.route(app.config['PREFIX'] + '/events/create', methods=['POST'])
+@app.route(app.config['PREFIX'] + '/events/', methods=['POST'])
 @parse_args_with_schema(EventCreateSchema)
 @token_auth_required
 def event_create(user, user_type, args):

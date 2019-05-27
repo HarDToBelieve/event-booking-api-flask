@@ -7,6 +7,7 @@ from app.common import queue_deferred
 
 def send_email_aysnc(message):
     with app.app_context():
+        print('Pass!!')
         mail.send(message)
 
 

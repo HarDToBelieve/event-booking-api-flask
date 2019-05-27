@@ -1,3 +1,4 @@
+from io import StringIO
 import datetime
 import random
 import string
@@ -15,10 +16,6 @@ from app.models.event import Event
 from app.models.location import Location
 from app.models.reservation import Reservation
 import csv
-
-
-class BookingEventSchema(Schema):
-    event_id = fields.Integer(required=True)
 
 
 @app.route(app.config['PREFIX'] + '/reservations/confirm/<int:event_id>', methods=['POST'])
@@ -49,13 +46,15 @@ def event_confirm(user, user_type, event_id):
 
 
 @app.route(app.config['PREFIX'] + '/reservations', methods=['POST'])
-@parse_args_with_schema(BookingEventSchema)
 @token_auth_required
-def event_booking_handle(user, user_type, args):
+def event_booking_handle(user, user_type):
+    if 'event_id' not in request.form:
+        raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid parameter')
+    
     if request.args.get('type') == 'public':
         if user_type != 'Attendee':
             raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid token')
-        event = Event.query.filter_by(id=args['event_id']).first()
+        event = Event.query.filter_by(id=request.form['event_id']).first()
         if event is None:
             raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Event not found')
         if datetime.datetime.now().date() > event.end_date:
@@ -71,20 +70,26 @@ def event_booking_handle(user, user_type, args):
         result = []
         if user_type != 'Organizer':
             raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid token')
-        event = Event.query.filter_by(id=args['event_id'], owner_id=user.id).first()
+        event = Event.query.filter_by(id=request.form['event_id'], owner_id=user.id).first()
         if event is None:
             raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Event not found')
         if 'csv_file' not in request.files:
             raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Need csv_file part')
         csv_file = request.files['csv_file']
+        new_file_name = 'tmp/' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=32)) + '.csv'
+        csv_file.save(new_file_name)
         if csv_file.filename == '':
             raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Not selected csv')
         if csv_file and allowed_csv(csv_file.filename):
-            csv_reader = csv.reader(csv_file)
+            csv_reader = csv.reader(open(new_file_name))
+            
+            if csv_reader.line_num != event.capacity:
+                raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Too many invitations')
+            
             for row in csv_reader:
                 user_mail = row[0]
                 existing_user = Attendee.query.filter_by(email=user_mail).first()
-                if existing_user is None:
+                if existing_user is not None:
                     reservation = Reservation(status='PENDING', event_id=event.id, attendee_id=user.id)
                     db.session.add(reservation)
                     db.session.commit()

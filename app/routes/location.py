@@ -20,7 +20,7 @@ class LocationUpdateSchema(Schema):
     address = fields.String(validate=validate.Length(max=max_len))
 
 
-@app.route(app.config['PREFIX'] + '/locations/create/', methods=['POST'])
+@app.route(app.config['PREFIX'] + '/locations', methods=['POST'])
 @parse_args_with_schema(LocationCreateSchema)
 @token_auth_required
 def location_create(user, user_type, args):
@@ -67,6 +67,11 @@ def location_delete(user, user_type, location_id):
     location = Location.query.filter_by(id=location_id, owner_id=user.id).first()
     if location is None:
         raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Location not found')
+    
+    events = location.events
+    for e in events:
+        db.session.delete(e)
+    
     db.session.delete(location)
     db.session.commit()
     return jsonify({
