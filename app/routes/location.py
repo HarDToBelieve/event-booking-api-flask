@@ -83,11 +83,11 @@ def location_delete(user, user_type, location_id):
 def location_list_all():
     page = None if request.args.get('page') is None else int(request.args.get('page'))
     result = Location.query.paginate(page=page, per_page=15)
-    has_next = 1
+    has_next = 'YES'
     if page is not None and page == -(-result.total // 15):
-        has_next = 0
+        has_next = None
     elif page is None:
-        has_next = 0
+        has_next = None
 
     return jsonify({
         'current_page': page,

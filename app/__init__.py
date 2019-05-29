@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, url_for
+from flask import Flask, jsonify, url_for, send_from_directory
 from config import Config
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -17,5 +17,11 @@ mail = Mail(app)
 migrate = Migrate(app, db)
 max_len = 500
 task_queue = rq.Queue('flask', connection=Redis.from_url(Config.REDIS_URL))
+
+
+@app.route('/uploads/<path:path>')
+def send_image(path):
+    return send_from_directory('uploads', path)
+
 
 from app import routes, models

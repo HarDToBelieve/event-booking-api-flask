@@ -45,20 +45,19 @@ def event_confirm(user, user_type, event_id):
     return jsonify({'message': 'Confirmed'}), 201
 
 
-@app.route(app.config['PREFIX'] + '/reservations', methods=['POST'])
+@app.route(app.config['PREFIX'] + 'events/<int:event_id>/reservations', methods=['POST'])
 @token_auth_required
-def event_booking_handle(user, user_type):
-    if 'event_id' not in request.form:
-        raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid parameter')
+def event_booking_handle(user, user_type, event_id):
     
-    if request.args.get('type') == 'public':
+    event = Event.query.filter_by('id', '=', event_id).first()
+    if event is None:
+        raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Event not found')
+    if datetime.datetime.now() > event.end_date:
+        raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Expired event')
+    
+    if event.type == 'public':
         if user_type != 'Attendee':
             raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid token')
-        event = Event.query.filter_by(id=request.form['event_id']).first()
-        if event is None:
-            raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Event not found')
-        if datetime.datetime.now().date() > event.end_date:
-            raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Expired event')
         
         reservation = Reservation(status='INVITED', event_id=event.id, attendee_id=user.id)
         db.session.add(reservation)
@@ -66,13 +65,11 @@ def event_booking_handle(user, user_type):
         return jsonify({
             'result': reservation.serialize()
         }), 201
-    elif request.args.get('type') == 'private':
+    elif event.type == 'private':
         result = []
         if user_type != 'Organizer':
             raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid token')
-        event = Event.query.filter_by(id=request.form['event_id'], owner_id=user.id).first()
-        if event is None:
-            raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Event not found')
+        
         if 'csv_file' not in request.files:
             raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Need csv_file part')
         csv_file = request.files['csv_file']
@@ -83,16 +80,22 @@ def event_booking_handle(user, user_type):
         if csv_file and allowed_csv(csv_file.filename):
             csv_reader = csv.reader(open(new_file_name))
             
-            if csv_reader.line_num != event.capacity:
+            if csv_reader.line_num > event.capacity:
                 raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Too many invitations')
             
             for row in csv_reader:
                 user_mail = row[0]
                 existing_user = Attendee.query.filter_by(email=user_mail).first()
                 if existing_user is not None:
-                    reservation = Reservation(status='PENDING', event_id=event.id, attendee_id=user.id)
-                    db.session.add(reservation)
-                    db.session.commit()
+                    
+                    existing_re = Reservation.query.filter_by(event_id=event.id, attendee_id=user.id).first()
+                    
+                    if existing_re is None:
+                        reservation = Reservation(status='PENDING', event_id=event.id, attendee_id=user.id)
+                        db.session.add(reservation)
+                        db.session.commit()
+                    else:
+                        reservation = existing_re
                 else:
                     rand_str = app.config['URL_MAIL'] + '?signup_code=' + \
                                ''.join(random.choices(string.ascii_uppercase + string.digits, k=32))
@@ -110,3 +113,28 @@ def event_booking_handle(user, user_type):
         return jsonify({
             'result': [x.serialize() for x in result]
         }), 201
+
+
+@app.route(app.config['PREFIX'] + 'events/<int:event_id>/reservations', methods=['DELETE'])
+@token_auth_required
+def reservation_delete(user, user_type, event_id):
+    if user_type != 'Attendee':
+        raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid token')
+
+    event = Event.query.filter_by('id', '=', event_id).first()
+    if event is None:
+        raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Event not found')
+    if user_type == 'Attendee' and event.type == 'private':
+        found = False
+        for re in event.reservations:
+            if re.attendee_id == user.id:
+                found = True
+        if found is False:
+            raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Permission denied')
+    
+    reservation = Reservation.query.filter_by(event_id=event.id, attendee_id=user.id).first()
+    db.session.delete(reservation)
+    db.session.commit()
+    return jsonify({
+        'message': 'Reservation deleted successfully'
+    }), 201

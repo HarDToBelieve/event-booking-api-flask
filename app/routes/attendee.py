@@ -100,10 +100,10 @@ def attendee_get_info(user, user_type):
     }), 200
 
 
-@app.route(app.config['PREFIX'] + '/attendees/private_events', methods=['GET'])
+@app.route(app.config['PREFIX'] + '/attendees/<int:attendee_id>/private_events', methods=['GET'])
 @token_auth_required
-def event_get_private_by_attendee(user, user_type):
-    if user_type != 'Attendee':
+def event_get_private_by_attendee(user, user_type, attendee_id):
+    if user_type != 'Attendee' or user.id != attendee_id:
         raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid token')
     
     reserves = user.reservations
@@ -116,10 +116,10 @@ def event_get_private_by_attendee(user, user_type):
     return jsonify([x.serialize() for x in result]), 200
 
 
-@app.route(app.config['PREFIX'] + '/attendees/<int:attendee_id>/events', methods=['GET'])
+@app.route(app.config['PREFIX'] + '/attendees/<int:attendee_id>/public_events', methods=['GET'])
 @token_auth_required
 def event_get_public_by_attendee(user, user_type, attendee_id):
-    if user_type != 'Attendee':
+    if user_type != 'Attendee' or user.id != attendee_id:
         raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid token')
     
     reserves = user.reservations
