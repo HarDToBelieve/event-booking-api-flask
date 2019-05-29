@@ -2,7 +2,7 @@ import datetime
 import os
 import random
 
-from flask import jsonify, request
+from flask import jsonify, request, send_from_directory
 from marshmallow import Schema, fields, validate
 
 from app import app, db, jwttoken, max_len
@@ -36,7 +36,7 @@ class EventUpdateSchema(Schema):
     capacity = fields.Integer()
 
 
-@app.route(app.config['PREFIX'] + '/events', methods=['POST'])
+@app.route(app.config['PREFIX'] + '/events/', methods=['POST'])
 @parse_args_with_schema(EventCreateSchema)
 @token_auth_required
 def event_create(user, user_type, args):
@@ -109,12 +109,12 @@ def event_delete(user, user_type, event_id):
     }), 201
 
 
-@app.route(app.config['PREFIX'] + '/events', methods=['GET'])
+@app.route(app.config['PREFIX'] + '/events/', methods=['GET'])
 def event_list_all():
     page = None if request.args.get('page') is None else int(request.args.get('page'))
     result = Event.query.filter_by(type='public').paginate(page=page, per_page=15)
     has_next = 'YES'
-    if page is not None and page == -(-result.total // 15):
+    if page is not None and page == (result.total // 15) + 1:
         has_next = None
     elif page is None:
         has_next = None
@@ -135,8 +135,6 @@ def event_list_all():
 @app.route(app.config['PREFIX'] + '/events/<int:event_id>', methods=['GET'])
 @token_auth_required
 def event_get_info(user, user_type, event_id):
-    if user_type != 'Attendee':
-        raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid token')
     event = Event.query.filter_by(id=event_id).first()
     
     if event is None:
@@ -145,25 +143,25 @@ def event_get_info(user, user_type, event_id):
     # owner = Organizer.query.filter_by(id=event.owner_id).first()
     # location = Location.query.filter_by(id=event.location_id).first()
     
-    if event.type == 'private':
-        for tmp in event.attendees:
-            if tmp.id == user.id:
-                return jsonify({
+    if event.type == 'private' and user_type == 'Attendee':
+        for re in event.reservations:
+            if re.attendee_id == user.id:
+                return jsonify({'result' : {
                     'detail': event.serialize(),
                     'nummber_of_attendees': len(event.reservations),
                     'contact': event.owner.email,
                     'location_name': event.location.name_location,
                     'location_address': event.location.address
-                }), 200
+                }}), 200
         raise Error(status_code=StatusCode.FORBIDDEN, error_message='Permission denied')
     else:
-        return jsonify({
+        return jsonify({'result': {
             'detail': event.serialize(),
             'nummber_of_attendees': len(event.reservations),
             'contact': event.owner.email,
             'location_name': event.location.name_location,
             'location_address': event.location.address
-        }), 200
+        }}), 200
 
 
 @app.route(app.config['PREFIX'] + '/events/<int:event_id>/upload', methods=['POST'])
@@ -183,42 +181,34 @@ def event_upload_image(user, user_type, event_id):
         new_file_name = str(datetime.datetime.now()) + '_' + str(random.randint(0, 9999999)) \
                         + '.' + img.filename.rsplit('.', 1)[1].lower()
         img.save(os.path.join('uploads', new_file_name))
+        event.img = new_file_name
+        db.session.commit()
         return jsonify({'message': 'Image uploaded'}), 201
     else:
         return jsonify({'message': 'Extension not allowed'})
 
 
-@app.route(app.config['PREFIX'] + '/events/organizer_events', methods=['GET'])
+@app.route(app.config['PREFIX'] + '/events/organizer_events/', methods=['GET'])
 @token_auth_required
 def event_get_by_organizer(user, user_type):
     if user_type != 'Organizer':
         raise Error(status_code=StatusCode.UNAUTHORIZED, error_message='Invalid token')
     
-    return jsonify([x.serialize() for x in user.events]), 200
-
-
-@app.route(app.config['PREFIX'] + '/events/<int:event_id>/reservations', methods=['GET'])
-@token_auth_required
-def attendee_get_by_event(user, user_type, event_id):
-    event = Event.query.filter_by(id=event_id, owner_id=user.id).first()
-    if event is None:
-        raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Event not found')
-
-    if user_type == 'Attendee' and event.type == 'private':
-        found = False
-        for re in event.reservations:
-            if re.attendee_id == user.id:
-                found = True
-        if found is False:
-            raise Error(status_code=StatusCode.BAD_REQUEST, error_message='Permission denied')
-        
     result = []
-    for re in event.reservations:
-        tmp = {}
-        at = re.attendees
-        tmp['user'] = at.serialize()
-        tmp['status'] = re.status
-        tmp['user_id'] = at.id
+    for ev in user.events:
+        tmp = {
+            'detail': ev.serialize(),
+            'nummber_of_attendees': len(ev.reservations),
+            'contact': ev.owner.email,
+            'location_name': ev.location.name_location,
+            'location_address': ev.location.address
+        }
         result.append(tmp)
     
     return jsonify(result), 200
+
+
+@app.route(app.config['PREFIX_FOR_IMG'] + '/uploads/<path:path>', methods=['GET'])
+def send_image(path):
+    root_dir = os.getcwd()
+    return send_from_directory(os.path.join(root_dir, 'uploads'), path)

@@ -112,7 +112,7 @@ def organizer_get_specific_info(organizer_id):
     return jsonify(organizer.serialize()), 200
 
 
-@app.route(app.config['PREFIX'] + '/organizers/<int:owner_id>/locations', methods=['GET'])
+@app.route(app.config['PREFIX'] + '/organizers/<int:owner_id>/locations/', methods=['GET'])
 def location_get_by_owner(owner_id):
     owner = Organizer.query.filter_by(id=owner_id).first()
     if owner is None:
@@ -121,7 +121,7 @@ def location_get_by_owner(owner_id):
     page = None if request.args.get('page') is None else int(request.args.get('page'))
     result = Location.query.filter_by(owner_id=owner_id).paginate(page=page, per_page=15)
     has_next = 'YES'
-    if page is not None and page == -(-result.total // 15):
+    if page is not None and page == -(-result.total // 15) + 1:
         has_next = None
     elif page is None:
         has_next = None
@@ -130,7 +130,7 @@ def location_get_by_owner(owner_id):
         'owner_id': owner_id,
         'current_page': page,
         'next_page_url': has_next,
-        'locations': [x.serialize() for x in result.items]
+        'data': [x.serialize() for x in result.items]
     }), 200
 
 

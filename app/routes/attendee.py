@@ -111,9 +111,16 @@ def event_get_private_by_attendee(user, user_type, attendee_id):
     for re in reserves:
         ev = re.events
         if ev.type == 'private':
-            result.append(ev)
-    
-    return jsonify([x.serialize() for x in result]), 200
+            tmp = {
+                'detail': ev.serialize(),
+                'nummber_of_attendees': len(ev.reservations),
+                'contact': ev.owner.email,
+                'location_name': ev.location.name_location,
+                'location_address': ev.location.address
+            }
+            result.append(tmp)
+
+    return jsonify(result), 200
 
 
 @app.route(app.config['PREFIX'] + '/attendees/<int:attendee_id>/public_events', methods=['GET'])
@@ -127,6 +134,13 @@ def event_get_public_by_attendee(user, user_type, attendee_id):
     for re in reserves:
         ev = re.events
         if ev.type == 'public':
-            result.append(ev)
-    
-    return jsonify([x.serialize() for x in result]), 200
+            tmp = {
+                'detail': ev.serialize(),
+                'nummber_of_attendees': len(ev.reservations),
+                'contact': ev.owner.email,
+                'location_name': ev.location.name_location,
+                'location_address': ev.location.address
+            }
+            result.append(tmp)
+
+    return jsonify(result), 200
